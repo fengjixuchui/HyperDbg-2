@@ -80,9 +80,6 @@ Here's a diagram that shows how HyperDbg works!
 </p>
 </br>
 
-HyperDbg subsystems: </br>
-<p align="center"><img align="center" width="70%" height="100%" src="https://github.com/HyperDbg/graphics/raw/master/Diagrams/subsystems/HyperDbg-subsystems.png" alt="HyperDbg Subsystems"></p>
-
 ## Plugins
 The plugin framework is not ready for the current version of HyperDbg. Future versions will support plugins.
 
@@ -100,6 +97,6 @@ If you want to create a pull request or contribute in HyperDbg please read [Cont
 
 
 ## License
-Dependencies are licensed by their own licenses.
+**HyperDbg**, and all the submodule and repos, unless a license is otherwise specified, are licensed under **GPLv3** LICENSE.
 
-**HyperDbg** is under **GPLv3** LICENSE.
+Dependencies are licensed by their own.
