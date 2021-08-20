@@ -33,6 +33,122 @@ CommandEvalHelp()
 }
 
 /**
+ * @brief Check test-cases for script-engine
+ *
+ * @return BOOLEAN
+ */
+BOOLEAN
+CommandEvalCheckTestcase()
+{
+    string  Line;
+    BOOLEAN IsOpened      = FALSE;
+    UINT64  ExpectedValue = 0;
+    BOOLEAN ExpectError   = FALSE;
+    string  Expr          = "";
+
+    //
+    // Read the test-case file for script-engine
+    //
+    ifstream File(SCRIPT_TEST_CASE_FILE_NAME);
+
+    if (File.is_open())
+    {
+        IsOpened = TRUE;
+
+        while (std::getline(File, Line))
+        {
+            //
+            // Test case number
+            //
+            ShowMessages("Test-case number : %s\n", Line.c_str());
+
+            //
+            // Test-case statement
+            //
+            if (!std::getline(File, Line))
+            {
+                return FALSE;
+            }
+
+            Expr = Line;
+            ShowMessages("Statement : %s\n", Line.c_str());
+
+            //
+            // Test-case result
+            //
+            if (!std::getline(File, Line))
+            {
+                return FALSE;
+            }
+
+            if (!Line.compare("$error$"))
+            {
+                //
+                // It's an $error$ statement
+                //
+                ShowMessages("Expected result : %s\n", Line.c_str());
+
+                ExpectError   = TRUE;
+                ExpectedValue = NULL;
+            }
+            else if (!ConvertStringToUInt64(Line, &ExpectedValue))
+            {
+                ShowMessages("err, the expected results are in incorrect format\n");
+                return FALSE;
+            }
+            else
+            {
+                //
+                // It's a value expected statement
+                //
+                ExpectError = FALSE;
+                ShowMessages("Expected result : %llx\n", ExpectedValue);
+            }
+
+            //
+            // Call wrapper for testing statements
+            //
+            Expr.append(" ");
+
+            //
+            // Test results
+            //
+            ShowMessages("Test result : %s\n", ScriptAutomaticStatementsTestWrapper(Expr, ExpectedValue, ExpectError) ? "passed" : "failed");
+
+            //
+            // Test-case end
+            //
+            if (!std::getline(File, Line))
+            {
+                return FALSE;
+            }
+
+            //
+            // Check end case
+            //
+            if (Line.compare("$end$"))
+            {
+                //
+                // err, we'd expect a $end$ at this situation
+                //
+                return FALSE;
+            }
+
+            ShowMessages("\n------------------------------------------------------------\n\n");
+        }
+
+        File.close();
+    }
+    if (!IsOpened)
+    {
+        ShowMessages("err, could not find '%s' file for test-cases\n", SCRIPT_TEST_CASE_FILE_NAME);
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+/**
  * @brief handler of ? command
  *
  * @param SplittedCommand
@@ -68,6 +184,22 @@ CommandEval(vector<string> SplittedCommand, string Command)
     // Trim it again
     //
     Trim(Command);
+
+    //
+    // Check if it's a test-case check or not
+    //
+    if (!Command.compare("test"))
+    {
+        //
+        // It's a test-case checker
+        //
+        if (!CommandEvalCheckTestcase())
+        {
+            ShowMessages("err, script test cases has problem encoding files\n");
+        }
+
+        return;
+    }
 
     //
     // TODO: end of string must have a whitspace. fix it.
@@ -126,7 +258,7 @@ CommandEval(vector<string> SplittedCommand, string Command)
                      "and is not based on the status of your system. You can use this command, "
                      "ONLY in debugger-mode\n\n");
 
-        ShowMessages("test Expression : %s \n", Command.c_str());
+        ShowMessages("test expression : %s \n", Command.c_str());
         ScriptEngineWrapperTestParser(Command);
     }
 }

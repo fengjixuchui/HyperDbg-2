@@ -654,6 +654,82 @@ CheckCpuSupportRtm()
 }
 
 /**
+ * @brief Get virtual address width for x86 processors
+ * 
+ * @return UINT32
+ */
+UINT32
+Getx86VirtualAddressWidth()
+{
+    int Regs[4];
+
+    GetCpuid(CPUID_ADDR_WIDTH, 0, Regs);
+
+    //
+    // Extracting bit 15:8 from eax register
+    //
+    return ((Regs[0] >> 8) & 0x0ff);
+}
+
+/**
+ * @brief Checks if the address is canonical based on x86 processor's
+ * virtual address width or not
+ * @param VAddr virtual address to check
+ * @param IsKernelAddress Filled to show whether the address is a 
+ * kernel address or user-address
+ * @brief IsKernelAddress wouldn't check for page attributes, it 
+ * just checks the address convention in Windows
+ * 
+ * @return BOOLEAN
+ */
+BOOLEAN
+CheckCanonicalVirtualAddress(UINT64 VAddr, PBOOLEAN IsKernelAddress)
+{
+    UINT64 Addr = (UINT64)VAddr;
+    UINT64 MaxVirtualAddrLowHalf, MinVirtualAddressHighHalf;
+
+    //
+    // Get processor's address width for VA
+    //
+    UINT32 AddrWidth = g_VirtualAddressWidth;
+
+    //
+    // get max address in lower-half canonical addr space
+    // e.g. if width is 48, then 0x00007FFF_FFFFFFFF
+    //
+    MaxVirtualAddrLowHalf = ((UINT64)1ull << (AddrWidth - 1)) - 1;
+
+    //
+    // get min address in higher-half canonical addr space
+    // e.g., if width is 48, then 0xFFFF8000_00000000
+    //
+    MinVirtualAddressHighHalf = ~MaxVirtualAddrLowHalf;
+
+    //
+    // Check to see if the address in a canonical address
+    //
+    if ((Addr > MaxVirtualAddrLowHalf) && (Addr < MinVirtualAddressHighHalf))
+    {
+        *IsKernelAddress = FALSE;
+        return FALSE;
+    }
+
+    //
+    // Set whether it's a kernel address or not
+    //
+    if (MinVirtualAddressHighHalf < Addr)
+    {
+        *IsKernelAddress = TRUE;
+    }
+    else
+    {
+        *IsKernelAddress = FALSE;
+    }
+
+    return TRUE;
+}
+
+/**
  * @brief Check the safety to access the memory
  * @param TargetAddress
  * @param Size
@@ -665,6 +741,19 @@ CheckMemoryAccessSafety(UINT64 TargetAddress, UINT32 Size)
 {
     CR3_TYPE GuestCr3;
     UINT64   OriginalCr3;
+    BOOLEAN  IsKernelAddress;
+
+    //
+    // First, we check if the address is canonical based
+    // on Intel processor's virtual address width
+    //
+    if (!CheckCanonicalVirtualAddress(TargetAddress, &IsKernelAddress))
+    {
+        //
+        // No need for further check, address is invalid
+        //
+        return FALSE;
+    }
 
     //
     // Find the current process cr3
@@ -678,7 +767,14 @@ CheckMemoryAccessSafety(UINT64 TargetAddress, UINT32 Size)
     OriginalCr3 = __readcr3();
     __writecr3(GuestCr3.Flags);
 
-    if (g_RtmSupport)
+    //
+    // We'll only check address with TSX if the address is a kernel-mode
+    // address because an exception is thrown if we access user-mode code
+    // from vmx-root mode, thus, TSX will fail the transaction and the
+    // result is not true, so we check each pages' page-table for user-mode
+    // codes in both user-mode and kernel-mode
+    //
+    if (g_RtmSupport && IsKernelAddress)
     {
         //
         // The guest supports Intel TSX

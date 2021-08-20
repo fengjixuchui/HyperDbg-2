@@ -3,6 +3,7 @@ PUBLIC AsmInvept
 .code _text
 
 ;------------------------------------------------------------------------
+
 ; Error codes :
 
     VMX_ERROR_CODE_SUCCESS              = 0
@@ -14,16 +15,17 @@ PUBLIC AsmInvept
 AsmInvept PROC PUBLIC
 
     invept  rcx, oword ptr [rdx]
-    jz @jz
-    jc @jc
+    jz ErrorWithStatus
+    jc ErrorCodeFailed
+    
     xor     rax, rax
     ret
 
-    @jz: 
+ErrorWithStatus: 
     mov     rax, VMX_ERROR_CODE_FAILED_WITH_STATUS
     ret
 
-    @jc:
+ErrorCodeFailed:
     mov     rax, VMX_ERROR_CODE_FAILED
     ret
 
@@ -32,20 +34,23 @@ AsmInvept ENDP
 ;------------------------------------------------------------------------
 
 AsmInvvpid PROC
-        invvpid rcx, oword ptr [rdx]
-        jz      @jz
-        jc      @jc
-        xor     rax, rax
-        ret
 
-@jz:    mov     rax, VMX_ERROR_CODE_FAILED_WITH_STATUS
-        ret
+    invvpid rcx, oword ptr [rdx]
+    jz      ErrorWithStatus
+    jc      ErrorCodeFailed
+    xor     rax, rax
+    ret
+    
+ErrorWithStatus:
+    mov     rax, VMX_ERROR_CODE_FAILED_WITH_STATUS
+    ret
 
-@jc:    mov     rax, VMX_ERROR_CODE_FAILED
-        ret
+ErrorCodeFailed:
+    mov     rax, VMX_ERROR_CODE_FAILED
+    ret
+    
 AsmInvvpid ENDP
 
 ;------------------------------------------------------------------------
-
 
 END

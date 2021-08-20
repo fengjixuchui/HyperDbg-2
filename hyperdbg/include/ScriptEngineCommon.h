@@ -13,6 +13,20 @@
  */
 #pragma once
 
+/**
+ * @brief global variable to save the result of script-engine statement
+ * tests
+ *
+ */
+UINT64 g_CurrentTestResult;
+
+/**
+ * @brief global variable to detect if there was an error in the result
+ *  of script-engine statement tests
+ *
+ */
+BOOLEAN g_CurrentTestResultHasError;
+
 #ifndef PacketChunkSize
 #    define PacketChunkSize 3000
 #endif // !PacketChunkSize
@@ -611,7 +625,7 @@ ScriptEngineKeywordDq(PUINT64 Address, BOOL * HasError)
 #endif // SCRIPT_ENGINE_KERNEL_MODE
 
 #ifdef SCRIPT_ENGINE_USER_MODE
-    Result = *Address;
+    //Result = *Address;
 #endif // SCRIPT_ENGINE_USER_MODE
 
 #ifdef SCRIPT_ENGINE_KERNEL_MODE
@@ -633,7 +647,11 @@ ScriptEngineFunctionEq(UINT64 Address, QWORD Value, BOOL * HasError)
 
     if (!CheckMemoryAccessSafety(Address, sizeof(QWORD)))
     {
-        *HasError = TRUE;
+        //
+        // Instead of indicating an error, just return false
+        // to assign it as a return result to a variable
+        //
+        // *HasError = TRUE;
 
         return FALSE;
     }
@@ -641,7 +659,7 @@ ScriptEngineFunctionEq(UINT64 Address, QWORD Value, BOOL * HasError)
 #endif // SCRIPT_ENGINE_KERNEL_MODE
 
 #ifdef SCRIPT_ENGINE_USER_MODE
-    *(UINT64 *)Address = Value;
+    //*(UINT64 *)Address = Value;
 #endif // SCRIPT_ENGINE_USER_MODE
 
 #ifdef SCRIPT_ENGINE_KERNEL_MODE
@@ -659,7 +677,11 @@ ScriptEngineFunctionEd(UINT64 Address, DWORD Value, BOOL * HasError)
 
     if (!CheckMemoryAccessSafety(Address, sizeof(DWORD)))
     {
-        *HasError = TRUE;
+        //
+        // Instead of indicating an error, just return false
+        // to assign it as a return result to a variable
+        //
+        // *HasError = TRUE;
 
         return FALSE;
     }
@@ -667,7 +689,7 @@ ScriptEngineFunctionEd(UINT64 Address, DWORD Value, BOOL * HasError)
 #endif // SCRIPT_ENGINE_KERNEL_MODE
 
 #ifdef SCRIPT_ENGINE_USER_MODE
-    *(DWORD *)Address = Value;
+    //*(DWORD *)Address = Value;
 #endif // SCRIPT_ENGINE_USER_MODE
 
 #ifdef SCRIPT_ENGINE_KERNEL_MODE
@@ -685,7 +707,11 @@ ScriptEngineFunctionEb(UINT64 Address, BYTE Value, BOOL * HasError)
 
     if (!CheckMemoryAccessSafety(Address, sizeof(BYTE)))
     {
-        *HasError = TRUE;
+        //
+        // Instead of indicating an error, just return false
+        // to assign it as a return result to a variable
+        //
+        // *HasError = TRUE;
 
         return FALSE;
     }
@@ -693,7 +719,7 @@ ScriptEngineFunctionEb(UINT64 Address, BYTE Value, BOOL * HasError)
 #endif // SCRIPT_ENGINE_KERNEL_MODE
 
 #ifdef SCRIPT_ENGINE_USER_MODE
-    *(BYTE *)Address = Value;
+    //*(BYTE *)Address = Value;
 #endif // SCRIPT_ENGINE_USER_MODE
 
 #ifdef SCRIPT_ENGINE_KERNEL_MODE
@@ -714,6 +740,13 @@ ScriptEngineFunctionPrint(UINT64 Tag, BOOLEAN ImmediateMessagePassing, UINT64 Va
 #ifdef SCRIPT_ENGINE_KERNEL_MODE
     LogSimpleWithTag(Tag, ImmediateMessagePassing, "%llx", Value);
 #endif // SCRIPT_ENGINE_KERNEL_MODE
+}
+
+VOID
+ScriptEngineFunctionTestStatement(UINT64 Tag, BOOLEAN ImmediateMessagePassing, UINT64 Value)
+{
+    g_CurrentTestResult = Value;
+    g_CurrentTestResultHasError = FALSE;
 }
 
 VOID
@@ -2069,7 +2102,7 @@ ScriptEngineExecute(PGUEST_REGS GuestRegs, ACTION_BUFFER ActionDetail, UINT64 * 
                         (unsigned long long)(*Indx * sizeof(SYMBOL)));
         *Indx = *Indx + 1;
 
-        DesVal = ScriptEngineFunctionEd(SrcVal0, SrcVal1, &HasError);
+        DesVal = ScriptEngineFunctionEd(SrcVal1, SrcVal0, &HasError);
 
         SetValue(GuestRegs, g_TempList, g_VariableList, Des, DesVal);
 
@@ -2093,12 +2126,12 @@ ScriptEngineExecute(PGUEST_REGS GuestRegs, ACTION_BUFFER ActionDetail, UINT64 * 
                         (unsigned long long)(*Indx * sizeof(SYMBOL)));
         *Indx = *Indx + 1;
 
-        DesVal = ScriptEngineFunctionEb(SrcVal0, SrcVal1, &HasError);
+        DesVal = ScriptEngineFunctionEb(SrcVal1, SrcVal0, &HasError);
 
         SetValue(GuestRegs, g_TempList, g_VariableList, Des, DesVal);
 
         return HasError;
-
+ 
     case FUNC_EQ:
         Src0  = (PSYMBOL)((unsigned long long)CodeBuffer->Head +
                          (unsigned long long)(*Indx * sizeof(SYMBOL)));
@@ -2117,11 +2150,13 @@ ScriptEngineExecute(PGUEST_REGS GuestRegs, ACTION_BUFFER ActionDetail, UINT64 * 
                         (unsigned long long)(*Indx * sizeof(SYMBOL)));
         *Indx = *Indx + 1;
 
-        DesVal = ScriptEngineFunctionEq(SrcVal0, SrcVal1, &HasError);
+        DesVal = ScriptEngineFunctionEq(SrcVal1, SrcVal0, &HasError);
 
         SetValue(GuestRegs, g_TempList, g_VariableList, Des, DesVal);
 
         return HasError;
+
+
     case FUNC_PAUSE:
         ScriptEngineFunctionPause(ActionDetail.Tag,
                                   ActionDetail.ImmediatelySendTheResults,
@@ -2612,19 +2647,15 @@ ScriptEngineExecute(PGUEST_REGS GuestRegs, ACTION_BUFFER ActionDetail, UINT64 * 
 
         DesVal = 1; // TRUE by default in user-mode
 
-        /*
-
-      if (CheckMemoryAccessSafety(SrcVal0, sizeof(BYTE)))
+        if (CheckMemoryAccessSafety(SrcVal0, sizeof(BYTE)))
         {
             DesVal = 1; // TRUE
-            LogInfo("address is valid");
         }
         else
         {
             DesVal = 0; // FALSE
-            LogInfo("address is invalid");
         }
-        */
+
 #endif // SCRIPT_ENGINE_KERNEL_MODE
 
 #ifdef SCRIPT_ENGINE_USER_MODE
@@ -2713,6 +2744,21 @@ ScriptEngineExecute(PGUEST_REGS GuestRegs, ACTION_BUFFER ActionDetail, UINT64 * 
         // Call the target function
         //
         ScriptEngineFunctionPrint(ActionDetail.Tag,
+                                  ActionDetail.ImmediatelySendTheResults,
+                                  SrcVal0);
+        return HasError;
+
+    case FUNC_TEST_STATEMENT:
+        Src0  = (PSYMBOL)((unsigned long long)CodeBuffer->Head +
+                         (unsigned long long)(*Indx * sizeof(SYMBOL)));
+        *Indx = *Indx + 1;
+        SrcVal0 =
+            GetValue(GuestRegs, ActionDetail, g_TempList, g_VariableList, Src0);
+
+        //
+        // Call the target function
+        //
+        ScriptEngineFunctionTestStatement(ActionDetail.Tag,
                                   ActionDetail.ImmediatelySendTheResults,
                                   SrcVal0);
         return HasError;

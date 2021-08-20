@@ -213,7 +213,7 @@ ScriptEngineWrapperTestPerformAction(PGUEST_REGS GuestRegs,
     //
     // Print symbol buffer
     //
-    PrintSymbolBuffer(CodeBuffer);
+    //PrintSymbolBuffer(CodeBuffer);
 
     UINT64        g_TempList[MAX_TEMP_COUNT] = {0};
     ACTION_BUFFER ActionBuffer               = {0};
@@ -232,6 +232,7 @@ ScriptEngineWrapperTestPerformAction(PGUEST_REGS GuestRegs,
             ActionBuffer.ImmediatelySendTheResults = FALSE;
             ActionBuffer.Tag                       = NULL;
 
+            
             //
             // If has error, show error message and abort.
             //
@@ -242,7 +243,8 @@ ScriptEngineWrapperTestPerformAction(PGUEST_REGS GuestRegs,
                 ScriptEngineGetOperatorName(&ErrorSymbol, NameOfOperator);
                 ShowMessages("invalid returning address for operator: %s",
                              NameOfOperator);
-
+                g_CurrentTestResultHasError = TRUE;
+                g_CurrentTestResult         = NULL;
                 break;
             }
         }
@@ -255,6 +257,38 @@ ScriptEngineWrapperTestPerformAction(PGUEST_REGS GuestRegs,
     RemoveSymbolBuffer(CodeBuffer);
 
     return;
+}
+
+/**
+ * @brief massive tests for script engine statements
+ * @param Expr The expression to test
+ * @param ExpectationValue What value this statements expects (not 
+ * used if ExceptError is TRUE)
+ * @param ExceptError True if the statement expects an error
+ * 
+ * @return BOOLEAN whether the test was successful or not
+ */
+BOOLEAN
+ScriptAutomaticStatementsTestWrapper(string Expr, UINT64 ExpectationValue, BOOLEAN ExceptError)
+{
+    //
+    // Call the test parser
+    //
+    ScriptEngineWrapperTestParser(Expr);
+
+    //
+    // Check the global variable to see the results
+    //
+    if (g_CurrentTestResultHasError && ExceptError)
+    {
+        return TRUE;
+    }
+    else if (ExpectationValue == g_CurrentTestResult)
+    {
+        return TRUE;
+    }
+
+    return FALSE;
 }
 
 /**

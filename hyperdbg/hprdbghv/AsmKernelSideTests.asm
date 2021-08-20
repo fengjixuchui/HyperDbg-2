@@ -9,7 +9,6 @@ EXTERN g_KernelTestR14:QWORD
 EXTERN g_KernelTestR13:QWORD
 EXTERN g_KernelTestR12:QWORD
 
-
 .code _text
 
 ;------------------------------------------------------------------------
@@ -32,7 +31,6 @@ AsmTestWrapperWithTestTags PROC PUBLIC
     mov r14, g_KernelTestTag1
     mov r15, g_KernelTestTag2
 
-
     pop r12                        ; r12 is not changed (non-volatile)
                                    ; we save it so we can restore to 
                                    ; TestKernelConfigureTagsAndCallTargetFunction
@@ -42,7 +40,7 @@ AsmTestWrapperWithTestTags PROC PUBLIC
     
     jmp g_KernelTestTargetFunction      ; jump target function (we didn't change its parameters)
 
-    RestoreState :
+RestoreState:
     push r12                       ; Restore to the previous function address to return
                                    ; TestKernelConfigureTagsAndCallTargetFunction
     
