@@ -472,6 +472,9 @@ CodeGen(TOKEN_LIST MatchedStack, PSYMBOL_BUFFER CodeBuffer, TOKEN Operator, PSCR
             Op0       = Pop(MatchedStack);
             Op0Symbol = ToSymbol(Op0, Error);
 
+
+            char * Format = Op0->Value;
+
             PSYMBOL OperandCountSymbol = NewSymbol();
             OperandCountSymbol->Type   = SYMBOL_VARIABLE_COUNT_TYPE;
             OperandCountSymbol->Value  = OperandCount;
@@ -484,12 +487,77 @@ CodeGen(TOKEN_LIST MatchedStack, PSYMBOL_BUFFER CodeBuffer, TOKEN Operator, PSCR
             PushSymbol(CodeBuffer, OperandCountSymbol);
             RemoveSymbol(OperandCountSymbol);
 
+            PSYMBOL FirstArg = (PSYMBOL)((unsigned long long)CodeBuffer->Head +
+                                (unsigned long long)(CodeBuffer->Pointer * sizeof(SYMBOL)));
+
+
             PSYMBOL Symbol;
+            int     ArgCount = TempStack->Pointer;
             for (int i = TempStack->Pointer - 1; i >= 0; i--)
             {
                 Symbol = TempStack->Head + i;
                 PushSymbol(CodeBuffer, Symbol);
             }
+
+            UINT32 i = 0;
+            char * Str = Format;
+            do
+            {
+                //
+                // Not the best way but some how for optimization
+                //
+                if (*Str == '%')
+                {
+                    CHAR Temp = *(Str + 1);
+
+                    if (Temp == 'd' || Temp == 'i' || Temp == 'u' || Temp == 'o' ||
+                        Temp == 'x' || Temp == 'c' || Temp == 'p' || Temp == 's' ||
+
+                        !strncmp(Str, "%ws", 3) || !strncmp(Str, "%ls", 3) ||
+
+                        !strncmp(Str, "%ld", 3) || !strncmp(Str, "%li", 3) ||
+                        !strncmp(Str, "%lu", 3) || !strncmp(Str, "%lo", 3) ||
+                        !strncmp(Str, "%lx", 3) ||
+
+                        !strncmp(Str, "%hd", 3) || !strncmp(Str, "%hi", 3) ||
+                        !strncmp(Str, "%hu", 3) || !strncmp(Str, "%ho", 3) ||
+                        !strncmp(Str, "%hx", 3) ||
+
+                        !strncmp(Str, "%lld", 4) || !strncmp(Str, "%lli", 4) ||
+                        !strncmp(Str, "%llu", 4) || !strncmp(Str, "%llo", 4) ||
+                        !strncmp(Str, "%llx", 4)
+
+                    )
+                    {
+                        if (i < ArgCount)
+                        {
+                            Symbol = FirstArg + i;
+                        }
+                        else
+                        {
+                            *Error = SCRIPT_ENGINE_ERROR_SYNTAX;
+                            break;
+                        }
+                        Symbol->Type &= 0xffffffff;
+                        Symbol->Type |= (UINT64)(Str - Format - 1) << 32;
+                        i++;
+                    }
+                }
+                Str++;
+            } while (*Str);
+
+            if (*Error == SCRIPT_ENGINE_ERROR_SYNTAX)
+            {
+                if (i != ArgCount)
+                {
+                    *Error = SCRIPT_ENGINE_ERROR_SYNTAX;
+                }
+            }
+            if (*Error == SCRIPT_ENGINE_ERROR_SYNTAX)
+            {
+                break;
+            }
+
             RemoveSymbolBuffer(TempStack);
 
             FreeTemp(Op0);
@@ -1684,11 +1752,10 @@ NewSymbolBuffer(void)
 void
 RemoveSymbolBuffer(PSYMBOL_BUFFER SymbolBuffer)
 {
-    // PrintSymbolBuffer(SymbolBuffer);
-    free(SymbolBuffer->Message);
+    //PrintSymbolBuffer(SymbolBuffer);
+    /*  free(SymbolBuffer->Message);
     free(SymbolBuffer->Head);
-    free(SymbolBuffer);
-    return;
+    free(SymbolBuffer);*/
 }
 
 /**

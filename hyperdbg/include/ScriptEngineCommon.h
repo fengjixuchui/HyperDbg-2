@@ -731,6 +731,7 @@ ScriptEngineFunctionEb(UINT64 Address, BYTE Value, BOOL * HasError)
     return TRUE;
 }
 
+// print
 VOID
 ScriptEngineFunctionPrint(UINT64 Tag, BOOLEAN ImmediateMessagePassing, UINT64 Value)
 {
@@ -751,6 +752,178 @@ ScriptEngineFunctionTestStatement(UINT64 Tag, BOOLEAN ImmediateMessagePassing, U
     g_CurrentTestResultHasError = FALSE;
 }
 
+//
+// Spinlock functions
+//
+
+// spinlock_lock
+VOID
+ScriptEngineFunctionSpinlockLock(volatile LONG * Lock)
+{
+#ifdef SCRIPT_ENGINE_USER_MODE
+    //
+    // Nothing on user-mode
+    //
+    return;
+#endif // SCRIPT_ENGINE_USER_MODE
+
+#ifdef SCRIPT_ENGINE_KERNEL_MODE
+    SpinlockLock(Lock);
+#endif // SCRIPT_ENGINE_KERNEL_MODE
+}
+
+// spinlock_unlock
+VOID
+ScriptEngineFunctionSpinlockUnlock(volatile LONG * Lock)
+{
+#ifdef SCRIPT_ENGINE_USER_MODE
+    //
+    // Nothing on user-mode
+    //
+    return;
+#endif // SCRIPT_ENGINE_USER_MODE
+
+#ifdef SCRIPT_ENGINE_KERNEL_MODE
+    SpinlockUnlock(Lock);
+#endif // SCRIPT_ENGINE_KERNEL_MODE
+}
+
+// spinlock_lock_custom_wait
+VOID
+ScriptEngineFunctionSpinlockLockCustomWait(volatile long * Lock, unsigned MaxWait)
+{
+#ifdef SCRIPT_ENGINE_USER_MODE
+    //
+    // Nothing on user-mode
+    //
+    return;
+#endif // SCRIPT_ENGINE_USER_MODE
+
+#ifdef SCRIPT_ENGINE_KERNEL_MODE
+    SpinlockLockWithCustomWait(Lock, MaxWait);
+#endif // SCRIPT_ENGINE_KERNEL_MODE
+}
+
+//
+// String length functions
+//
+
+// strlen
+UINT64
+ScriptEngineFunctionStrlen(const char * Address)
+{
+    UINT64 Result = 0;
+#ifdef SCRIPT_ENGINE_USER_MODE
+    Result = strlen(Address);
+#endif // SCRIPT_ENGINE_USER_MODE
+
+#ifdef SCRIPT_ENGINE_KERNEL_MODE
+    Result = VmxrootCompatibleStrlen(Address);
+#endif // SCRIPT_ENGINE_KERNEL_MODE
+
+    return Result;
+}
+
+// wcslen
+UINT64
+ScriptEngineFunctionWcslen(const wchar_t * Address)
+{
+    UINT64 Result = 0;
+
+#ifdef SCRIPT_ENGINE_USER_MODE
+    Result = wcslen(Address);
+#endif // SCRIPT_ENGINE_USER_MODE
+
+#ifdef SCRIPT_ENGINE_KERNEL_MODE
+    Result = VmxrootCompatibleWcslen(Address);
+#endif // SCRIPT_ENGINE_KERNEL_MODE
+
+    return Result;
+}
+
+//
+// Interlocked atomic functions
+//
+
+// interlocked_exchange
+long long
+ScriptEngineFunctionInterlockedExchange(long long volatile * Target,
+                                        long long            Value)
+{
+    long long Result = 0;
+
+    Result = InterlockedExchange64(Target, Value);
+
+    return Result;
+}
+
+// interlocked_exchange_add
+long long
+ScriptEngineFunctionInterlockedExchangeAdd(long long volatile * Addend,
+                                           long long            Value)
+{
+    long long Result = 0;
+
+    Result = InterlockedExchangeAdd64(Addend, Value);
+
+    return Result;
+}
+
+// interlocked_exchange_increment
+long long
+ScriptEngineFunctionInterlockedIncrement(long long volatile * Addend)
+{
+    long long Result = 0;
+
+    Result = InterlockedIncrement64(Addend);
+
+    return Result;
+}
+
+// interlocked_exchange_decrement
+long long
+ScriptEngineFunctionInterlockedDecrement(long long volatile * Addend)
+{
+    long long Result = 0;
+
+    Result = InterlockedDecrement64(Addend);
+
+    return Result;
+}
+
+// interlocked_compare_exchange
+long long
+ScriptEngineFunctionInterlockedCompareExchange(
+    long long volatile * Destination,
+    long long            ExChange,
+    long long            Comperand)
+{
+    long long Result = 0;
+
+    Result = InterlockedCompareExchange64(Destination, ExChange, Comperand);
+
+    return Result;
+}
+
+// enable_event
+VOID
+ScriptEngineFunctionEnableEvent(UINT64  Tag,
+                                BOOLEAN ImmediateMessagePassing,
+                                UINT64  Value)
+{
+#ifdef SCRIPT_ENGINE_USER_MODE
+    ShowMessages("err, enabling events is not possible in user-mode\n");
+#endif // SCRIPT_ENGINE_USER_MODE
+
+#ifdef SCRIPT_ENGINE_KERNEL_MODE
+    if (!DebuggerEnableEvent(Value + DebuggerEventTagStartSeed))
+    {
+        LogInfo("Invalid tag id (%d).", Value);
+    }
+#endif // SCRIPT_ENGINE_KERNEL_MODE
+}
+
+// disable_event
 VOID
 ScriptEngineFunctionDisableEvent(UINT64  Tag,
                                  BOOLEAN ImmediateMessagePassing,
@@ -768,22 +941,7 @@ ScriptEngineFunctionDisableEvent(UINT64  Tag,
 #endif // SCRIPT_ENGINE_KERNEL_MODE
 }
 
-VOID
-ScriptEngineFunctionEnableEvent(UINT64  Tag,
-                                BOOLEAN ImmediateMessagePassing,
-                                UINT64  Value)
-{
-#ifdef SCRIPT_ENGINE_USER_MODE
-    ShowMessages("err, enabling events is not possible in user-mode\n");
-#endif // SCRIPT_ENGINE_USER_MODE
-
-#ifdef SCRIPT_ENGINE_KERNEL_MODE
-    if (!DebuggerEnableEvent(Value + DebuggerEventTagStartSeed))
-    {
-        LogInfo("Invalid tag id (%d).", Value);
-    }
-#endif // SCRIPT_ENGINE_KERNEL_MODE
-}
+// pause
 VOID
 ScriptEngineFunctionPause(UINT64 Tag, BOOLEAN ImmediateMessagePassing, PGUEST_REGS GuestRegs, UINT64 Context)
 {
@@ -1135,77 +1293,21 @@ ScriptEngineFunctionPrintf(PGUEST_REGS   GuestRegs,
                            PSYMBOL       FirstArg,
                            BOOLEAN *     HasError)
 {
-    *HasError = FALSE;
-
-    PSYMBOL Symbol;
-    UINT32  i = 0;
-
-    char * Str = Format;
-
-    do
-    {
-        //
-        // Not the best way but some how for optimization
-        //
-        if (*Str == '%')
-        {
-            CHAR Temp = *(Str + 1);
-
-            if (Temp == 'd' || Temp == 'i' || Temp == 'u' || Temp == 'o' ||
-                Temp == 'x' || Temp == 'c' || Temp == 'p' || Temp == 's' ||
-
-                !strncmp(Str, "%ws", 3) || !strncmp(Str, "%ls", 3) ||
-
-                !strncmp(Str, "%ld", 3) || !strncmp(Str, "%li", 3) ||
-                !strncmp(Str, "%lu", 3) || !strncmp(Str, "%lo", 3) ||
-                !strncmp(Str, "%lx", 3) ||
-
-                !strncmp(Str, "%hd", 3) || !strncmp(Str, "%hi", 3) ||
-                !strncmp(Str, "%hu", 3) || !strncmp(Str, "%ho", 3) ||
-                !strncmp(Str, "%hx", 3) ||
-
-                !strncmp(Str, "%lld", 4) || !strncmp(Str, "%lli", 4) ||
-                !strncmp(Str, "%llu", 4) || !strncmp(Str, "%llo", 4) ||
-                !strncmp(Str, "%llx", 4)
-
-            )
-            {
-                if (i < ArgCount)
-                    Symbol = FirstArg + i;
-                else
-                {
-                    *HasError = TRUE;
-                    break;
-                }
-                Symbol->Type &= 0xffffffff;
-                Symbol->Type |= (UINT64)(Str - Format - 1) << 32;
-                i++;
-            }
-        }
-        Str++;
-    } while (*Str);
-
-    if (*HasError == FALSE)
-        *HasError = (i != ArgCount);
-    if (*HasError)
-        return;
-
     //
-    // Call printf
-    //
-
-    //
-    // When we're here, all the pointers are the pointers including %ws and %s
-    // pointers are checked and are safe to access
+    // The printf function
     //
 
     char    FinalBuffer[PacketChunkSize]              = {0};
     UINT32  CurrentPositionInFinalBuffer              = 0;
     UINT32  CurrentProcessedPositionFromStartOfFormat = 0;
     BOOLEAN WithoutAnyFormatSpecifier                 = TRUE;
+
     UINT64  Val;
     UINT32  Position;
     UINT32  LenOfFormats = strlen(Format) + 1;
+    PSYMBOL Symbol;
+
+    *HasError = FALSE;
 
     for (int i = 0; i < ArgCount; i++)
     {
@@ -1217,8 +1319,12 @@ ScriptEngineFunctionPrintf(PGUEST_REGS   GuestRegs,
         //
 
         Position = (Symbol->Type >> 32) + 1;
-        Symbol->Type &= 0x7fffffff;
-        Val = GetValue(GuestRegs, ActionDetail, g_TempList, g_VariableList, Symbol);
+
+        SYMBOL TempSymbol = {0};
+        memcpy(&TempSymbol, Symbol, sizeof(SYMBOL));
+        TempSymbol.Type &= 0x7fffffff;
+
+        Val = GetValue(GuestRegs, ActionDetail, g_TempList, g_VariableList, &TempSymbol);
 
         CHAR PercentageChar = Format[Position];
 
