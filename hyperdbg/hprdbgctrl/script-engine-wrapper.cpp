@@ -16,7 +16,7 @@
 // Include parser
 //
 #define SCRIPT_ENGINE_USER_MODE
-#include "ScriptEngineCommon.h"
+#include "ScriptEngineEval.h"
 
 //
 // Global Variables
@@ -214,11 +214,20 @@ PrintSymbolBufferWrapper(PVOID SymbolBuffer)
  * @return VOID
  */
 VOID
-ScriptEngineWrapperTestPerformAction(PGUEST_REGS GuestRegs,
-                                     string      Expr)
+ScriptEngineEvalWrapper(PGUEST_REGS GuestRegs,
+                        string      Expr)
 {
     //
-    // Test Parser
+    // Allocate global variables holder
+    //
+    if (!g_ScriptGlobalVariables)
+    {
+        g_ScriptGlobalVariables = (UINT64 *)malloc(MAX_VAR_COUNT * sizeof(UINT64));
+        RtlZeroMemory(g_ScriptGlobalVariables, MAX_VAR_COUNT * sizeof(UINT64));
+    }
+
+    //
+    // Run Parser
     //
     PSYMBOL_BUFFER CodeBuffer = ScriptEngineParse((char *)Expr.c_str());
 
@@ -254,8 +263,8 @@ ScriptEngineWrapperTestPerformAction(PGUEST_REGS GuestRegs,
                 ScriptEngineGetOperatorName(&ErrorSymbol, NameOfOperator);
                 ShowMessages("invalid returning address for operator: %s",
                              NameOfOperator);
-                g_CurrentTestResultHasError = TRUE;
-                g_CurrentTestResult         = NULL;
+                g_CurrentExprEvalResultHasError = TRUE;
+                g_CurrentExprEvalResult         = NULL;
                 break;
             }
         }
@@ -290,11 +299,11 @@ ScriptAutomaticStatementsTestWrapper(string Expr, UINT64 ExpectationValue, BOOLE
     //
     // Check the global variable to see the results
     //
-    if (g_CurrentTestResultHasError && ExceptError)
+    if (g_CurrentExprEvalResultHasError && ExceptError)
     {
         return TRUE;
     }
-    else if (ExpectationValue == g_CurrentTestResult)
+    else if (ExpectationValue == g_CurrentExprEvalResult)
     {
         return TRUE;
     }
@@ -349,17 +358,33 @@ ScriptEngineWrapperTestParser(string Expr)
     GuestRegs.r14 = (ULONG64)testw;
     GuestRegs.r15 = (ULONG64)test;
 
-    //
-    // Allocate global variables holder
-    //
-    if (!g_ScriptGlobalVariables)
-    {
-        g_ScriptGlobalVariables = (UINT64 *)malloc(MAX_VAR_COUNT * sizeof(UINT64));
-        RtlZeroMemory(g_ScriptGlobalVariables, MAX_VAR_COUNT * sizeof(UINT64));
-    }
-
-    ScriptEngineWrapperTestPerformAction(&GuestRegs, Expr);
+    ScriptEngineEvalWrapper(&GuestRegs, Expr);
     free(TestStruct);
+}
+
+/**
+ * @brief In the local debugging (VMI mode) environment, this function computes the expressions
+ * @details for example, if the user u ExAllocatePoolWithTag+0x10 this will evaluate the expr
+ * @param Expr
+ * @param HasError
+ * 
+ * @return UINT64
+ */
+UINT64
+ScriptEngineEvalUInt64StyleExpressionWrapper(string Expr, PBOOLEAN HasError)
+{
+    //
+    // In VMI-mode we'll form all registers as zero
+    //
+    GUEST_REGS GuestRegs = {0};
+
+    ScriptEngineEvalWrapper(&GuestRegs, Expr);
+
+    //
+    // Set the results and return the value
+    //
+    *HasError = g_CurrentExprEvalResultHasError;
+    return g_CurrentExprEvalResult;
 }
 
 /**

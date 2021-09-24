@@ -27,6 +27,7 @@ CommandMonitorHelp()
                  "(hex value)] \n");
 
     ShowMessages("\t\te.g : !monitor rw fffff801deadb000 fffff801deadbfff\n");
+    ShowMessages("\t\te.g : !monitor rw nt!Kd_DEFAULT_Mask Kd_DEFAULT_Mask+5\n");
     ShowMessages(
         "\t\te.g : !monitor r fffff801deadb000 fffff801deadbfff pid 400\n");
     ShowMessages("\t\te.g : !monitor w fffff801deadb000 fffff801deadbfff core 2 "
@@ -121,7 +122,7 @@ CommandMonitor(vector<string> SplittedCommand, string Command)
             //
             if (!SetFrom)
             {
-                if (!SymbolConvertNameToAddress(
+                if (!SymbolConvertNameOrExprToAddress(
                         SplittedCommandCaseSensitive.at(IndexInCommandCaseSensitive - 1),
                         &OptionalParam1))
                 {
@@ -137,7 +138,7 @@ CommandMonitor(vector<string> SplittedCommand, string Command)
             }
             else if (!SetTo)
             {
-                if (!SymbolConvertNameToAddress(
+                if (!SymbolConvertNameOrExprToAddress(
                         SplittedCommandCaseSensitive.at(IndexInCommandCaseSensitive - 1),
                         &OptionalParam2))
                 {

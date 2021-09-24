@@ -143,7 +143,7 @@ SymbolReloadOrDownloadSymbols(BOOLEAN IsDownload, BOOLEAN SilentLoad)
 
 /**
  * @brief check and convert string to a 64 bit unsigned interger and also
- *  check for symbol object names
+ *  check for symbol object names and evaluate expressions
  * 
  * @param TextToConvert the target string
  * @param Result result will be save to the pointer
@@ -151,24 +151,45 @@ SymbolReloadOrDownloadSymbols(BOOLEAN IsDownload, BOOLEAN SilentLoad)
  * @return BOOLEAN shows whether the conversion was successful or not
  */
 BOOLEAN
-SymbolConvertNameToAddress(string TextToConvert, PUINT64 Result)
+SymbolConvertNameOrExprToAddress(string TextToConvert, PUINT64 Result)
 {
-    BOOLEAN IsFound = FALSE;
-    UINT64  Address = NULL;
+    BOOLEAN IsFound            = FALSE;
+    BOOLEAN HasError           = NULL;
+    UINT64  Address            = NULL;
+    string  ConstTextToConvert = TextToConvert;
 
     if (!ConvertStringToUInt64(TextToConvert, &Address))
     {
         //
         // Check for symbol object names
         //
-        Address = ScriptEngineConvertNameToAddressWrapper(TextToConvert.c_str(), &IsFound);
+        Address = ScriptEngineConvertNameToAddressWrapper(ConstTextToConvert.c_str(), &IsFound);
 
         if (!IsFound)
         {
             //
-            // It's neither a number, nor a founded object name
+            // It's neither a number, nor a founded object name,
+            // as the last resort, we have to test whether it's an expression or not
+            // if we're in the Debugger Mode then we have to send it the kernel to get
+            // the evaluation, if we're in VMI mode, then we evaluate it here with all
+            // registers set to Zero
             //
-            IsFound = FALSE;
+            Address = ScriptEngineEvalSingleExpression(TextToConvert, &HasError);
+
+            if (HasError)
+            {
+                //
+                // Not found or has error
+                //
+                IsFound = FALSE;
+            }
+            else
+            {
+                //
+                // Expression evaluated successfully
+                //
+                IsFound = TRUE;
+            }
         }
         else
         {

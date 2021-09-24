@@ -11,11 +11,6 @@
  */
 #include "pch.h"
 
-//
-// Global Variables
-//
-extern BOOLEAN g_IsSerialConnectedToRemoteDebuggee;
-
 /**
  * @brief help of help command :)
  *
@@ -26,6 +21,14 @@ CommandFormatsHelp()
 {
     ShowMessages(".formats : Show a value or register in different formats.\n\n");
     ShowMessages("syntax : \t.formats [hex value | register | Expression]\n");
+
+    ShowMessages("\t\te.g : .formats nt!ExAllocatePoolWithTag\n");
+    ShowMessages("\t\te.g : .formats nt!Kd_DEFAULT_Mask\n");
+    ShowMessages("\t\te.g : .formats nt!Kd_DEFAULT_Mask+5\n");
+    ShowMessages("\t\te.g : .formats 55\n");
+    ShowMessages("\t\te.g : .formats @rax\n");
+    ShowMessages("\t\te.g : .formats @rbx+@rcx\n");
+    ShowMessages("\t\te.g : .formats $pid\n");
 }
 
 /**
@@ -99,11 +102,8 @@ CommandFormatsShowResults(UINT64 U64Value)
 VOID
 CommandFormats(vector<string> SplittedCommand, string Command)
 {
-    PVOID  CodeBuffer;
-    UINT64 BufferAddress;
-    UINT64 ConstantValue = 0;
-    UINT32 BufferLength;
-    UINT32 Pointer;
+    UINT64  ConstantValue = 0;
+    BOOLEAN HasError      = TRUE;
 
     if (SplittedCommand.size() == 1)
     {
@@ -128,87 +128,16 @@ CommandFormats(vector<string> SplittedCommand, string Command)
     Trim(Command);
 
     //
-    // Command IS USED IN THE ELSE, DO NOT TOUCH THE COMMAND
+    // Evaluate a single expression
     //
+    ConstantValue = ScriptEngineEvalSingleExpression(Command, &HasError);
 
-    if (g_IsSerialConnectedToRemoteDebuggee)
+    if (HasError)
     {
-        //
-        // Send over serial
-        //
-        //
-        // Prepend and append 'print(' and ')'
-        //
-        Command.insert(0, "formats(");
-        Command.append(");");
-
-        //
-        // TODO: end of string must have a whitspace. fix it.
-        //
-        Command.append(" ");
-        // Expr = " x = 4 >> 1; ";
-
-        //
-        // Run script engine handler
-        //
-        CodeBuffer = ScriptEngineParseWrapper((char *)Command.c_str());
-
-        if (CodeBuffer == NULL)
-        {
-            //
-            // return to show that this item contains an script
-            //
-            return;
-        }
-
-        //
-        // Print symbols (test)
-        //
-        // PrintSymbolBufferWrapper(CodeBuffer);
-
-        //
-        // Set the buffer and length
-        //
-        BufferAddress = ScriptEngineWrapperGetHead(CodeBuffer);
-        BufferLength  = ScriptEngineWrapperGetSize(CodeBuffer);
-        Pointer       = ScriptEngineWrapperGetPointer(CodeBuffer);
-
-        //
-        // Send it to the remote debuggee
-        //
-        KdSendScriptPacketToDebuggee(BufferAddress, BufferLength, Pointer, TRUE);
-
-        //
-        // Remove the buffer of script engine interpreted code
-        //
-        ScriptEngineWrapperRemoveSymbolBuffer(CodeBuffer);
+        ShowErrorMessage(ConstantValue);
     }
     else
     {
-        //
-        // The user is either in VMI-mode or not connected to debuggee,
-        // in this state, we will support .formats for constant values
-        // not register, or expression
-        //
-        if (SplittedCommand.size() != 2)
-        {
-            ShowMessages("err, only one constant value is allowed when you're not connected to a debuggee\n\n");
-            CommandFormatsHelp();
-            return;
-        }
-
-        if (!ConvertStringToUInt64(SplittedCommand.at(1), &ConstantValue))
-        {
-            //
-            // Unkonwn parameter
-            //
-            ShowMessages("err, unknown parameter '%s'\nwhile you're not connected to any debuggee (Debugger Mode), "
-                         "you can only use a constant value in the '.formats' and you're not allowed to use registers "
-                         "or expressions\n\n",
-                         Command.c_str());
-            return;
-        }
-
         //
         // Show formats results for a constant
         //

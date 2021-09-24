@@ -28,6 +28,8 @@ CommandPa2vaHelp()
     ShowMessages("syntax : \t!pa2va [Virtual Address (hex value)] pid [Process "
                  "id (hex value)]\n");
     ShowMessages("\t\te.g : !pa2va nt!ExAllocatePoolWithTag\n");
+    ShowMessages("\t\te.g : !pa2va nt!ExAllocatePoolWithTag+5\n");
+    ShowMessages("\t\te.g : !pa2va @rax+5\n");
     ShowMessages("\t\te.g : !pa2va fffff801deadbeef\n");
     ShowMessages("\t\te.g : !pa2va fffff801deadbeef pid 0xc8\n");
 }
@@ -62,7 +64,7 @@ CommandPa2va(vector<string> SplittedCommand, string Command)
         //
         // It's just a address for current process
         //
-        if (!SymbolConvertNameToAddress(SplittedCommandCaseSensitive.at(1), &TargetPa))
+        if (!SymbolConvertNameOrExprToAddress(SplittedCommandCaseSensitive.at(1), &TargetPa))
         {
             //
             // Couldn't resolve or unkonwn parameter
@@ -84,7 +86,7 @@ CommandPa2va(vector<string> SplittedCommand, string Command)
                 ShowMessages("incorrect address, please enter a valid process id\n\n");
                 return;
             }
-            if (!SymbolConvertNameToAddress(SplittedCommandCaseSensitive.at(3), &TargetPa))
+            if (!SymbolConvertNameOrExprToAddress(SplittedCommandCaseSensitive.at(3), &TargetPa))
             {
                 //
                 // Couldn't resolve or unkonwn parameter
@@ -96,7 +98,7 @@ CommandPa2va(vector<string> SplittedCommand, string Command)
         }
         else if (!SplittedCommand.at(2).compare("pid"))
         {
-            if (!SymbolConvertNameToAddress(SplittedCommandCaseSensitive.at(1), &TargetPa))
+            if (!SymbolConvertNameOrExprToAddress(SplittedCommandCaseSensitive.at(1), &TargetPa))
             {
                 //
                 // Couldn't resolve or unkonwn parameter

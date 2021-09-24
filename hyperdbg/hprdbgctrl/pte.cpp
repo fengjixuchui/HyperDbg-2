@@ -22,6 +22,7 @@ CommandPteHelp()
     ShowMessages("!pte : Find virtual address of different paging-levels.\n\n");
     ShowMessages("syntax : \t!pte [Virtual Address (hex value)]\n");
     ShowMessages("\t\te.g : !pte nt!ExAllocatePoolWithTag\n");
+    ShowMessages("\t\te.g : !pte nt!ExAllocatePoolWithTag+5\n");
     ShowMessages("\t\te.g : !pte fffff801deadbeef\n");
 }
 
@@ -62,7 +63,7 @@ CommandPte(vector<string> SplittedCommand, string Command)
     //
     Trim(Command);
 
-    if (!SymbolConvertNameToAddress(Command, &TargetVa))
+    if (!SymbolConvertNameOrExprToAddress(Command, &TargetVa))
     {
         //
         // Couldn't resolve or unkonwn parameter
